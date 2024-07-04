@@ -1,3 +1,6 @@
 bitcoinlib
 eth_keys
 base58
+requests
+eth_keys
+ecdsa

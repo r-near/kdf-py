@@ -1,9 +1,45 @@
 import hashlib
+import json
+from typing import Literal
 
 import base58
 import bitcoinlib
 import eth_keys
+import requests
 from ecdsa import SECP256k1, VerifyingKey
+
+
+def get_public_key(account_id: str, network: Literal["testnet", "mainnet"]) -> str:
+    """
+    Fetch the public key for a given NEAR account from the specified network.
+
+    This function sends a JSON-RPC request to the NEAR network to retrieve
+    the public key associated with the given account.
+
+    :param account_id: The NEAR account ID to fetch the public key for.
+    :param network: The NEAR network to query ("testnet" or "mainnet").
+    :return: The public key associated with the account.
+    """
+    if network not in ["testnet", "mainnet"]:
+        raise ValueError("Unsupported network. Choose 'testnet' or 'mainnet'.")
+    url = f"https://rpc.{network}.near.org"
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "dontcare",
+        "method": "query",
+        "params": {
+            "request_type": "call_function",
+            "finality": "final",
+            "account_id": account_id,
+            "method_name": "public_key",
+            "args_base64": "e30=",
+        },
+    }
+    response = requests.post(url, json=payload)
+    response.raise_for_status()
+    byte_array = response.json()["result"]["result"]
+    return json.loads(bytes(byte_array).decode())
 
 
 def derive_child_key(near_address: str, near_public_key: str, path: str) -> bytes:
@@ -52,14 +88,14 @@ def derive_crypto_address(
 
 # Example usage
 if __name__ == "__main__":
-    near_address = "felipe-near.testnet"
-    near_public_key = (
-        "secp256k1:4NfTiv3UsGahebgTaHyD9vF8KYKMBnfd6kh94mK6xv8fGBiJB8TBtFMP5WWXz6B89Ac1fbpzPwAvoyQebemHFwx3"
-    )
+    signer_id = "felipe-near.testnet"
+    near_network = "testnet"
+    multichain_contract_id = "v2.multichain-mpc.testnet"
 
-    eth_address = derive_crypto_address(near_address, near_public_key, "ethereum")
-    btc_testnet_address = derive_crypto_address(near_address, near_public_key, "bitcoin", "testnet")
-    btc_mainnet_address = derive_crypto_address(near_address, near_public_key, "bitcoin", "mainnet")
+    near_public_key = get_public_key(multichain_contract_id, near_network)
+    eth_address = derive_crypto_address(signer_id, near_public_key, "ethereum")
+    btc_testnet_address = derive_crypto_address(signer_id, near_public_key, "bitcoin", "testnet")
+    btc_mainnet_address = derive_crypto_address(signer_id, near_public_key, "bitcoin", "mainnet")
 
     print(f"Derived Ethereum address: {eth_address}")
     print(f"Derived Bitcoin testnet address: {btc_testnet_address}")
